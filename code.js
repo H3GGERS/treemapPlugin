@@ -14,82 +14,91 @@ function randomWeights(n, rng) {
   return w;
 }
 
-// === Squarified Treemap (correct orientation) ===============================
-function squarifyTreemap(weights, W, H, basePadding){
-  const total = weights.reduce((a,b)=>a+b,0);
+// === Squarified Treemap (mosaic: alternate row/column each pass) ============
+function squarifyTreemap(weights, W, H, basePadding) {
+  const total = weights.reduce((a, b) => a + b, 0);
   if (total <= 0) return [];
-  const area   = W * H;
-  const items  = weights.map((w,i)=>({ area:(w/total)*area, index:i }))
-                        .sort((a,b)=>b.area-a.area);
+  const area  = W * H;
+
+  // scale + sort big-to-small
+  const items = weights.map((w, i) => ({ area: (w / total) * area, index: i }))
+                       .sort((a, b) => b.area - a.area);
 
   const rects = [];
   let x = 0, y = 0, w = W, h = H;
   const EPS = 1e-6, MIN_PX = 1;
 
-  function worst(rowAreas, side){
-    if (rowAreas.length === 0) return Infinity;
-    const sum = rowAreas.reduce((a,b)=>a+b,0);
+  function worst(rowAreas, side) {
+    if (!rowAreas.length) return Infinity;
+    const sum = rowAreas.reduce((a, b) => a + b, 0);
     const max = Math.max(...rowAreas);
     const min = Math.min(...rowAreas);
-    const s2  = side*side || EPS;
-    return Math.max((s2*max)/(sum*sum), (sum*sum)/(s2*min));
+    const s2  = Math.max(EPS, side * side);
+    return Math.max((s2 * max) / (sum * sum), (sum * sum) / (s2 * min));
   }
 
-  function layoutRow(row){
-    // Choose orientation: if width >= height → lay a horizontal ROW (across width)
-    // Correct thickness: rows use width, columns use height
-    const layingRow = (w >= h);
+  // NEW: flip direction after each layout to ensure mix of rows/columns
+  let nextHorizontal = (W >= H); // start sensible, then alternate
 
-    const rowSum = row.reduce((a,r)=>a+r.area,0);
-    const thickness = layingRow ? (rowSum / Math.max(EPS, w))
-                                : (rowSum / Math.max(EPS, h));
+  function layoutRow(row) {
+    const rowSum   = row.reduce((a, r) => a + r.area, 0);
+    const horizontal = nextHorizontal;
 
-    if (layingRow){
-      // Place a row along the top, spanning current width
+    // thickness uses the span along the *orthogonal* axis
+    const thickness = horizontal
+      ? (rowSum / Math.max(EPS, w))   // row height
+      : (rowSum / Math.max(EPS, h));  // column width
+
+    if (horizontal) {
       let _x = x;
-      for (const r of row){
+      for (const r of row) {
         const rw = r.area / Math.max(EPS, thickness);
         const rh = thickness;
 
-        const pad = Math.max(0, Math.min(basePadding, rw/2 - 0.5, rh/2 - 0.5));
-        const rx  = _x + pad, ry = y + pad;
-        const rwP = Math.max(MIN_PX, rw - 2*pad);
-        const rhP = Math.max(MIN_PX, rh - 2*pad);
-
-        rects.push({ x: rx, y: ry, w: rwP, h: rhP, index: r.index });
+        const pad = Math.max(0, Math.min(basePadding, rw / 2 - 0.5, rh / 2 - 0.5));
+        rects.push({
+          x: _x + pad,
+          y: y + pad,
+          w: Math.max(MIN_PX, rw - 2 * pad),
+          h: Math.max(MIN_PX, rh - 2 * pad),
+          index: r.index
+        });
         _x += rw;
       }
       y += thickness;
       h = Math.max(0, h - thickness);
     } else {
-      // Place a column along the left, spanning current height
       let _y = y;
-      for (const r of row){
+      for (const r of row) {
         const rh = r.area / Math.max(EPS, thickness);
         const rw = thickness;
 
-        const pad = Math.max(0, Math.min(basePadding, rw/2 - 0.5, rh/2 - 0.5));
-        const rx  = x + pad, ry = _y + pad;
-        const rwP = Math.max(MIN_PX, rw - 2*pad);
-        const rhP = Math.max(MIN_PX, rh - 2*pad);
-
-        rects.push({ x: rx, y: ry, w: rwP, h: rhP, index: r.index });
+        const pad = Math.max(0, Math.min(basePadding, rw / 2 - 0.5, rh / 2 - 0.5));
+        rects.push({
+          x: x + pad,
+          y: _y + pad,
+          w: Math.max(MIN_PX, rw - 2 * pad),
+          h: Math.max(MIN_PX, rh - 2 * pad),
+          index: r.index
+        });
         _y += rh;
       }
       x += thickness;
       w = Math.max(0, w - thickness);
     }
+
+    // flip for the next pass (mosaic effect)
+    nextHorizontal = !nextHorizontal;
   }
 
   let row = [];
-  while (items.length){
-    // Use the shorter side only for the *aspect test*; not for thickness
-    const side = Math.max(EPS, Math.min(w, h));
-    const item = items[0];
+  while (items.length && w > EPS && h > EPS) {
+    const side   = Math.max(EPS, Math.min(w, h)); // only for aspect test
+    const item   = items[0];
     const newRow = row.concat([item]);
 
     if (row.length === 0 ||
-        worst(newRow.map(r=>r.area), side) <= worst(row.map(r=>r.area), side)){
+        worst(newRow.map(r => r.area), side) <= worst(row.map(r => r.area), side)) {
       row = newRow;
       items.shift();
     } else {
@@ -97,9 +106,10 @@ function squarifyTreemap(weights, W, H, basePadding){
       row = [];
     }
   }
-  if (row.length && w > EPS && h > EPS){
+  if (row.length && w > EPS && h > EPS) {
     layoutRow(row);
   }
+
   return rects;
 }
 
