@@ -1,7 +1,18 @@
 // === Utilities ===============================================================
 function hashSeed(s){let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
 function mulberry32(a){return function(){let t=(a+=0x6D2B79F5);t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}
-function randomWeights(n,rng){return Array.from({length:n},()=>Math.max(1e-6,rng()));}
+// More balanced "random" weights (Dirichlet-ish via sum of uniforms).
+// k=3 keeps variety without a long skinny tail; bump k to 4–5 for even tighter sizes.
+function randomWeights(n, rng) {
+  const k = 3; // increase to 4 or 5 for more uniform sizes
+  const w = new Array(n);
+  for (let i = 0; i < n; i++) {
+    let s = 0;
+    for (let j = 0; j < k; j++) s += rng(); // Irwin–Hall distribution
+    w[i] = Math.max(1e-6, s); // keep positive
+  }
+  return w;
+}
 
 // === Squarified Treemap (correct orientation) ===============================
 function squarifyTreemap(weights, W, H, basePadding){
