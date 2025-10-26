@@ -4,8 +4,7 @@
   "editorType": ["figma", "figjam"],
   "api": "1.0.0",
   "main": "code.js",
-  "ui": "ui.html",
-  "icon": "treemapper.png",           
+  "ui": "ui.html",        
   "menu": [
     { "name": "Create treemap in selected frame", "command": "create" }
   ]
