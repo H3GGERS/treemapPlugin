@@ -4,31 +4,47 @@
     <meta charset="utf-8" />
     <title>Treemap Filler</title>
     <style>
-      .inline-radio {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      padding: 2px 0;
+      :root { color-scheme: light dark; }
+      body {
+        font: 12px/1.4 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        margin: 12px;
+        color: #111;
+      }
+      h3 { margin: 0 0 8px; font-size: 13px; }
+      label { display: block; margin: 6px 0 3px; }
+      input, select, textarea, button {
+        width: 100%; box-sizing: border-box; font-size: 12px;
+      }
+      textarea { resize: vertical; }
+      fieldset {
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 8px;
+        margin-top: 12px;
+      }
+      legend { padding: 0 6px; color: #444; font-weight: 500; }
+      .hint { color: #666; font-size: 11px; }
+      button {
+        margin-top: 12px;
+        padding: 8px;
+        border-radius: 8px;
       }
 
-      .inline-radio input[type="radio"] {
-      margin: 0;
-      accent-color: #007AFF; /* optional: Figma-blue accent */
-      transform: scale(1.1);
+      .row { display: flex; gap: 8px; }
+      .row > div { flex: 1; }
+
+      /* Inline radios */
+      .inline-radio {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 4px 0;
       }
-      :root { color-scheme: light; }
-      body { font: 12px/1.4 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 12px; color:#111; }
-      h3 { margin: 0 0 8px; }
-      label { display:block; margin: 8px 0 4px; }
-      input, select, textarea, button { width: 100%; box-sizing: border-box; }
-      textarea { resize: vertical; }
-      .row { display:flex; gap:8px; }
-      .row > div { flex:1; }
-      fieldset { border:1px solid #ddd; padding:10px; border-radius:8px; margin-top:12px; }
-      legend { padding:0 6px; color:#444; }
-      .hint { color:#666; font-size:11px; }
-      button { margin-top: 12px; padding: 8px; border-radius: 8px; }
+      .inline-radio input[type="radio"] {
+        margin: 0;
+        accent-color: #007AFF; /* optional Figma blue */
+        transform: scale(1.1);
+      }
     </style>
   </head>
   <body>
@@ -47,24 +63,56 @@
     <textarea id="weights" rows="4"
       placeholder="Comma or newline-separated numbers, e.g.:
 12, 4, 9, 3, 7"></textarea>
-    <div class="hint">If provided, N is ignored and the number of rectangles = number of weights.</div>
+    <div class="hint">
+      If provided, N is ignored and the number of rectangles = number of weights.
+    </div>
 
     <fieldset>
-    <legend>Color mode</legend>
+      <legend>Color mode</legend>
 
-    <label class="inline-radio">
-    Random palette (default)
-    <input type="radio" name="colormode" value="random" checked>
-    </label>
+      <label class="inline-radio">
+        <input type="radio" name="colormode" value="random" checked>
+        Random palette (default)
+      </label>
 
-    <label class="inline-radio">
-    Sample from linear gradient style
-    <input type="radio" name="colormode" value="gradient">
-    </label>
+      <label class="inline-radio">
+        <input type="radio" name="colormode" value="gradient">
+        Sample from linear gradient style
+      </label>
 
-    <div id="gradient-controls" style="display:none; margin-top:6px;">
-    <!-- existing gradient UI stays unchanged -->
-    </div>
+      <div id="gradient-controls" style="display:none; margin-top:6px;">
+        <label>Gradient style</label>
+        <select id="gradientStyle">
+          <option value="">(loading…)</option>
+        </select>
+
+        <fieldset style="margin-top:10px;">
+          <legend>Create new gradient style</legend>
+          <div class="row">
+            <div>
+              <label>Start color</label>
+              <input id="gStart" type="text" value="#5F88FF" />
+            </div>
+            <div>
+              <label>End color</label>
+              <input id="gEnd" type="text" value="#00D0A0" />
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Angle (deg)</label>
+              <input id="gAngle" type="number" value="0" />
+            </div>
+            <div>
+              <label>Name</label>
+              <input id="gName" type="text" value="Treemap Gradient" />
+            </div>
+          </div>
+          <button id="createGradient">Create gradient style</button>
+          <div class="hint">Creates a local linear gradient paint style you can reuse.</div>
+          <div class="hint">Note: Only <b>local</b> paint styles appear here. Duplicate library styles into this file if needed.</div>
+        </fieldset>
+      </div>
     </fieldset>
 
     <button id="run">Fill selected frame</button>
@@ -72,12 +120,10 @@
     <script>
       const $ = (id) => document.getElementById(id);
 
-      // === Utility to request current styles from main thread ===
       function requestStyles() {
         parent.postMessage({ pluginMessage: { type: 'request-styles' } }, '*');
       }
 
-      // === Color mode helpers ===
       function getColorMode() {
         const el = document.querySelector('input[name="colormode"]:checked');
         return el ? el.value : 'random';
@@ -92,7 +138,7 @@
         });
       });
 
-      // === Receive messages from code.js ===
+      // Receive messages from code.js
       window.onmessage = (e) => {
         const msg = e.data.pluginMessage;
         if (!msg) return;
@@ -123,20 +169,14 @@
           sel.appendChild(opt);
           sel.value = msg.style.id;
         }
-
-        if (msg.type === 'notify') {
-          // Optional notifications
-          // console.log(msg.message);
-        }
       };
 
-      // === Re-request styles when UI loads (and once more shortly after) ===
+      // Request styles when UI loads
       window.addEventListener('DOMContentLoaded', () => {
         requestStyles();
-        setTimeout(requestStyles, 100); // timing safety for UI mount
+        setTimeout(requestStyles, 100);
       });
 
-      // === Create new gradient style ===
       $('createGradient').onclick = () => {
         const payload = {
           type: 'create-gradient-style',
@@ -148,7 +188,6 @@
         parent.postMessage({ pluginMessage: payload }, '*');
       };
 
-      // === Run treemap ===
       $('run').onclick = () => {
         const count = parseInt($('count').value, 10);
         const padding = parseFloat($('padding').value);
