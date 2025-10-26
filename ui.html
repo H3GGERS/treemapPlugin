@@ -12,38 +12,42 @@
       }
       h3 { margin: 0 0 8px; font-size: 13px; }
       label { display: block; margin: 6px 0 3px; }
-      input, select, textarea, button {
-        width: 100%; box-sizing: border-box; font-size: 12px;
-      }
+      input, select, textarea, button { width: 100%; box-sizing: border-box; font-size: 12px; }
       textarea { resize: vertical; }
-      fieldset {
-        border: 1px solid #ddd;
-        padding: 10px;
-        border-radius: 8px;
-        margin-top: 12px;
-      }
+      fieldset { border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-top: 12px; }
       legend { padding: 0 6px; color: #444; font-weight: 500; }
       .hint { color: #666; font-size: 11px; }
-      button {
-        margin-top: 12px;
-        padding: 8px;
-        border-radius: 8px;
-      }
+      button { margin-top: 12px; padding: 8px; border-radius: 8px; }
 
       .row { display: flex; gap: 8px; }
       .row > div { flex: 1; }
 
-      /* Inline radios */
+      /* Inline radios: left-aligned, compact, with hover affordance */
       .inline-radio {
         display: flex;
         align-items: center;
-        gap: 6px;
-        margin: 4px 0;
+        gap: 8px;
+        padding: 4px 6px;
+        border-radius: 6px;
+        cursor: default;
+        user-select: none;
+      }
+      .inline-radio:hover {
+        background: rgba(0, 0, 0, 0.04);
+      }
+      @media (prefers-color-scheme: dark) {
+        .inline-radio:hover { background: rgba(255, 255, 255, 0.06); }
       }
       .inline-radio input[type="radio"] {
-        margin: 0;
+        width: auto; /* don’t stretch */
         accent-color: #007AFF; /* optional Figma blue */
-        transform: scale(1.1);
+        margin: 0;
+        transform: scale(1.05);
+      }
+      .inline-radio label {
+        margin: 0; /* keep single-line, tight */
+        width: auto;
+        flex: 1 1 auto;
       }
     </style>
   </head>
@@ -63,22 +67,20 @@
     <textarea id="weights" rows="4"
       placeholder="Comma or newline-separated numbers, e.g.:
 12, 4, 9, 3, 7"></textarea>
-    <div class="hint">
-      If provided, N is ignored and the number of rectangles = number of weights.
-    </div>
+    <div class="hint">If provided, N is ignored and the number of rectangles = number of weights.</div>
 
     <fieldset>
       <legend>Color mode</legend>
 
-      <label class="inline-radio">
-        <input type="radio" name="colormode" value="random" checked>
-        Random palette (default)
-      </label>
+      <div class="inline-radio">
+        <input type="radio" name="colormode" value="random" id="mode-random" checked>
+        <label for="mode-random">Random palette (default)</label>
+      </div>
 
-      <label class="inline-radio">
-        <input type="radio" name="colormode" value="gradient">
-        Sample from linear gradient style
-      </label>
+      <div class="inline-radio">
+        <input type="radio" name="colormode" value="gradient" id="mode-gradient">
+        <label for="mode-gradient">Sample from linear gradient style</label>
+      </div>
 
       <div id="gradient-controls" style="display:none; margin-top:6px;">
         <label>Gradient style</label>
@@ -120,6 +122,7 @@
     <script>
       const $ = (id) => document.getElementById(id);
 
+      // Request styles from main
       function requestStyles() {
         parent.postMessage({ pluginMessage: { type: 'request-styles' } }, '*');
       }
@@ -129,13 +132,14 @@
         return el ? el.value : 'random';
       }
 
-      // Show/hide gradient controls and re-fetch styles
+      // Toggle gradient controls + re-fetch styles when needed
+      function updateColorModeUI() {
+        const isGradient = getColorMode() === 'gradient';
+        $('gradient-controls').style.display = isGradient ? 'block' : 'none';
+        if (isGradient) requestStyles();
+      }
       document.querySelectorAll('input[name="colormode"]').forEach(r => {
-        r.addEventListener('change', () => {
-          const isGradient = getColorMode() === 'gradient';
-          $('gradient-controls').style.display = isGradient ? 'block' : 'none';
-          if (isGradient) requestStyles();
-        });
+        r.addEventListener('change', updateColorModeUI);
       });
 
       // Receive messages from code.js
@@ -171,12 +175,14 @@
         }
       };
 
-      // Request styles when UI loads
+      // Initial load: request styles and ensure correct visibility
       window.addEventListener('DOMContentLoaded', () => {
         requestStyles();
-        setTimeout(requestStyles, 100);
+        setTimeout(requestStyles, 100); // timing safety
+        updateColorModeUI();
       });
 
+      // Create gradient style
       $('createGradient').onclick = () => {
         const payload = {
           type: 'create-gradient-style',
@@ -188,6 +194,7 @@
         parent.postMessage({ pluginMessage: payload }, '*');
       };
 
+      // Run treemap
       $('run').onclick = () => {
         const count = parseInt($('count').value, 10);
         const padding = parseFloat($('padding').value);
