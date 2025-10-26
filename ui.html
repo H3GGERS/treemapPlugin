@@ -1,0 +1,20 @@
+<!-- Standard link tag-->
+<link rel="stylesheet" href="../../node_modules/figma-plugin-ds/dist/figma-plugin-ds.css">
+<!-- ui.html -->
+<html>
+  <body>
+    <label>Start (0%): <input type="color" id="color1" value="#e34842" /></label><br/>
+    <label>Mid (50%): <input type="color" id="color2" value="#424553" /></label><br/>
+    <label>End (100%): <input type="color" id="color3" value="#66c868" /></label><br/>
+    <button id="apply">Apply</button>
+
+    <script>
+      document.getElementById("apply").onclick = () => {
+        const color1 = document.getElementById("color1").value;
+        const color2 = document.getElementById("color2").value;
+        const color3 = document.getElementById("color3").value;
+        parent.postMessage({ pluginMessage: { type: 'apply-gradient', colors: [color1, color2, color3] } }, '*');
+      };
+    </script>
+  </body>
+</html>
