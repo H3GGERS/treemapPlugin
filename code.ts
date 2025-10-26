@@ -29,14 +29,14 @@ function randomWeights(n: number, rng: () => number): number[] {
 // --- Squarified Treemap -----------------------------------------------------
 // Based on Bruls, Huizing, van Wijk (2000), simplified implementation.
 
-type Rect = { x: number; y: number; w: number; h: number; index: number };
+type TreemapRect = { x: number; y: number; w: number; h: number; index: number };
 
 function squarifyTreemap(
   weights: number[],
   width: number,
   height: number,
   padding: number
-): Rect[] {
+): TreemapRect[] {
   const total = weights.reduce((a, b) => a + b, 0);
   if (total <= 0) return [];
 
@@ -45,7 +45,7 @@ function squarifyTreemap(
   const scaled = weights.map((w) => (w / total) * area);
 
   // Work arrays
-  const rects: Rect[] = [];
+  const rects: TreemapRect[] = [];
   let x = 0, y = 0, w = width, h = height;
 
   // Items: keep indices so we can color deterministically
