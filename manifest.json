@@ -1,18 +1,11 @@
 {
-  "name": "RandomFill",
-  "id": "1494776968348585118",
+  "name": "Treemap Filler",
+  "id": "treemap-filler",
+  "editorType": ["figma", "figjam"],
   "api": "1.0.0",
-  "main": "code.js",
-  "capabilities": [],
+  "main": "code.ts",
   "ui": "ui.html",
-  "enableProposedApi": false,
-  "documentAccess": "dynamic-page",
-  "editorType": [
-    "figma"
-  ],
-  "networkAccess": {
-    "allowedDomains": [
-      "none"
-    ]
-  }
+  "menu": [
+    { "name": "Create treemap in selected frame", "command": "create" }
+  ]
 }

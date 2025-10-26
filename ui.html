@@ -1,19 +1,57 @@
-<!-- Standard link tag-->
-<link rel="stylesheet" href="../../node_modules/figma-plugin-ds/dist/figma-plugin-ds.css">
-<!-- ui.html -->
+<!doctype html>
 <html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { font: 12px/1.4 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 12px; }
+      label { display:block; margin: 8px 0 4px; }
+      textarea, input { width: 100%; box-sizing: border-box; }
+      .row { display:flex; gap:8px; }
+      .row > div { flex:1; }
+      button { margin-top: 12px; width: 100%; padding: 8px; }
+      .hint { color:#666; font-size:11px; }
+    </style>
+  </head>
   <body>
-    <label>Start (0%): <input type="color" id="color1" value="#e34842" /></label><br/>
-    <label>Mid (50%): <input type="color" id="color2" value="#424553" /></label><br/>
-    <label>End (100%): <input type="color" id="color3" value="#66c868" /></label><br/>
-    <button id="apply">Apply</button>
+    <h3>Treemap options</h3>
+
+    <label>Count (N)</label>
+    <input id="count" type="number" min="1" max="500" value="25"/>
+
+    <label>Padding (px)</label>
+    <input id="padding" type="number" min="0" max="100" value="2"/>
+
+    <label>Random seed <span class="hint">(blank = truly random)</span></label>
+    <input id="seed" type="text" placeholder="e.g., 42"/>
+
+    <label>Custom weights (optional)</label>
+    <textarea id="weights" rows="5"
+      placeholder="Enter comma or newline-separated numbers, e.g.:
+12, 4, 9, 3, 7"></textarea>
+    <div class="hint">If provided, N is ignored and the number of rectangles = number of weights.</div>
+
+    <button id="run">Fill selected frame</button>
 
     <script>
-      document.getElementById("apply").onclick = () => {
-        const color1 = document.getElementById("color1").value;
-        const color2 = document.getElementById("color2").value;
-        const color3 = document.getElementById("color3").value;
-        parent.postMessage({ pluginMessage: { type: 'apply-gradient', colors: [color1, color2, color3] } }, '*');
+      const $ = (id) => document.getElementById(id);
+      document.getElementById('run').onclick = () => {
+        const count = parseInt($('count').value, 10);
+        const padding = parseFloat($('padding').value);
+        const seed = $('seed').value.trim();
+
+        let weightsRaw = $('weights').value.trim();
+        let weights = null;
+        if (weightsRaw.length) {
+          weights = weightsRaw
+            .split(/[\s,]+/)
+            .map(Number)
+            .filter(n => Number.isFinite(n) && n > 0);
+          if (!weights.length) weights = null;
+        }
+
+        parent.postMessage({
+          pluginMessage: { type: 'run', count, padding, seed, weights }
+        }, '*');
       };
     </script>
   </body>
