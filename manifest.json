@@ -3,7 +3,7 @@
   "id": "treemap-filler",
   "editorType": ["figma", "figjam"],
   "api": "1.0.0",
-  "main": "code.ts",
+  "main": "code.js",      
   "ui": "ui.html",
   "menu": [
     { "name": "Create treemap in selected frame", "command": "create" }
