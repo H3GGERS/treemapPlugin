@@ -3,13 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <style>
-      body { font: 12px/1.4 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 12px; }
+      body { font: 12px/1.4 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 12px; color:#111; }
+      h3 { margin: 0 0 8px; }
       label { display:block; margin: 8px 0 4px; }
-      textarea, input { width: 100%; box-sizing: border-box; }
+      input, select, textarea, button { width: 100%; box-sizing: border-box; }
+      textarea { resize: vertical; }
       .row { display:flex; gap:8px; }
       .row > div { flex:1; }
-      button { margin-top: 12px; width: 100%; padding: 8px; }
+      fieldset { border:1px solid #ddd; padding:10px; border-radius:8px; margin-top:12px; }
+      legend { padding:0 6px; color:#444; }
       .hint { color:#666; font-size:11px; }
+      button { margin-top: 12px; padding: 8px; }
     </style>
   </head>
   <body>
@@ -19,22 +23,130 @@
     <input id="count" type="number" min="1" max="500" value="25"/>
 
     <label>Padding (px)</label>
-    <input id="padding" type="number" min="0" max="100" value="2"/>
+    <input id="padding" type="number" min="0" max="100" value="4"/>
 
     <label>Random seed <span class="hint">(blank = truly random)</span></label>
     <input id="seed" type="text" placeholder="e.g., 42"/>
 
     <label>Custom weights (optional)</label>
-    <textarea id="weights" rows="5"
-      placeholder="Enter comma or newline-separated numbers, e.g.:
+    <textarea id="weights" rows="4"
+      placeholder="Comma or newline-separated numbers, e.g.:
 12, 4, 9, 3, 7"></textarea>
     <div class="hint">If provided, N is ignored and the number of rectangles = number of weights.</div>
+
+    <fieldset>
+      <legend>Color mode</legend>
+      <label>
+        <input type="radio" name="colormode" value="random" checked>
+        Random palette (default)
+      </label>
+      <label>
+        <input type="radio" name="colormode" value="gradient">
+        Sample from linear gradient style
+      </label>
+
+      <div id="gradient-controls" style="display:none; margin-top:6px;">
+        <label>Gradient style</label>
+        <select id="gradientStyle">
+          <option value="">(loading…)</option>
+        </select>
+
+        <fieldset style="margin-top:10px;">
+          <legend>Create new gradient style</legend>
+          <div class="row">
+            <div>
+              <label>Start color</label>
+              <input id="gStart" type="text" value="#5F88FF" />
+            </div>
+            <div>
+              <label>End color</label>
+              <input id="gEnd" type="text" value="#00D0A0" />
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Angle (deg)</label>
+              <input id="gAngle" type="number" value="0" />
+            </div>
+            <div>
+              <label>Name</label>
+              <input id="gName" type="text" value="Treemap Gradient" />
+            </div>
+          </div>
+          <button id="createGradient">Create gradient style</button>
+          <div class="hint">Creates a local linear gradient paint style you can reuse.</div>
+        </fieldset>
+      </div>
+    </fieldset>
 
     <button id="run">Fill selected frame</button>
 
     <script>
       const $ = (id) => document.getElementById(id);
-      document.getElementById('run').onclick = () => {
+
+      function getColorMode() {
+        const el = document.querySelector('input[name="colormode"]:checked');
+        return el ? el.value : 'random';
+      }
+
+      // Toggle gradient controls
+      document.querySelectorAll('input[name="colormode"]').forEach(r => {
+        r.addEventListener('change', () => {
+          $('gradient-controls').style.display = getColorMode() === 'gradient' ? 'block' : 'none';
+        });
+      });
+
+      // Receive styles list from plugin
+      window.onmessage = (e) => {
+        const msg = e.data.pluginMessage;
+        if (!msg) return;
+        if (msg.type === 'styles') {
+          const sel = $('gradientStyle');
+          sel.innerHTML = '';
+          if (!msg.styles.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = '(no linear gradient styles found)';
+            sel.appendChild(opt);
+          } else {
+            msg.styles.forEach(s => {
+              const opt = document.createElement('option');
+              opt.value = s.id;
+              opt.textContent = s.name;
+              sel.appendChild(opt);
+            });
+          }
+        }
+        if (msg.type === 'style-created') {
+          // add to dropdown and select it
+          const sel = $('gradientStyle');
+          const opt = document.createElement('option');
+          opt.value = msg.style.id;
+          opt.textContent = msg.style.name;
+          sel.appendChild(opt);
+          sel.value = msg.style.id;
+        }
+        if (msg.type === 'notify') {
+          // optional notifications from main
+          // console.log(msg.message);
+        }
+      };
+
+      // Ask main thread for current styles list when UI loads
+      parent.postMessage({ pluginMessage: { type: 'request-styles' } }, '*');
+
+      $('createGradient').onclick = () => {
+        const payload = {
+          type: 'create-gradient-style',
+          name: $('gName').value.trim() || 'Treemap Gradient',
+          start: $('gStart').value.trim(),
+          end: $('gEnd').value.trim(),
+          angle: parseFloat($('gAngle').value) || 0
+        };
+        parent.postMessage({ pluginMessage: payload }, '*');
+      };
+
+      $('run').onclick = () => {
         const count = parseInt($('count').value, 10);
         const padding = parseFloat($('padding').value);
         const seed = $('seed').value.trim();
@@ -42,15 +154,15 @@
         let weightsRaw = $('weights').value.trim();
         let weights = null;
         if (weightsRaw.length) {
-          weights = weightsRaw
-            .split(/[\s,]+/)
-            .map(Number)
-            .filter(n => Number.isFinite(n) && n > 0);
+          weights = weightsRaw.split(/[\s,]+/).map(Number).filter(n => Number.isFinite(n) && n > 0);
           if (!weights.length) weights = null;
         }
 
+        const colorMode = getColorMode();
+        const gradientStyleId = colorMode === 'gradient' ? $('gradientStyle').value : '';
+
         parent.postMessage({
-          pluginMessage: { type: 'run', count, padding, seed, weights }
+          pluginMessage: { type: 'run', count, padding, seed, weights, colorMode, gradientStyleId }
         }, '*');
       };
     </script>
