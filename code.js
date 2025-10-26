@@ -165,9 +165,15 @@ function clampToContainer(node, container){
 }
 
 // === Plugin entry ============================================================
-figma.on('run', ({command})=>{
-  if (command === 'create'){
-    figma.showUI(__html__, { width: 360, height: 420 });
+figma.on('run', ({ command }) => {
+  if (command === 'create') {
+    figma.showUI(__html__, { width: 380, height: 560 });
+    // send immediately
+    figma.ui.postMessage({ type: 'styles', styles: listLinearGradientStyles() });
+    // send again after UI has fully mounted (timing safety)
+    setTimeout(() => {
+      figma.ui.postMessage({ type: 'styles', styles: listLinearGradientStyles() });
+    }, 50);
   } else {
     figma.closePlugin();
   }

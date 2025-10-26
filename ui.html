@@ -2,7 +2,9 @@
 <html>
   <head>
     <meta charset="utf-8" />
+    <title>Treemap Filler</title>
     <style>
+      :root { color-scheme: light dark; }
       body { font: 12px/1.4 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 12px; color:#111; }
       h3 { margin: 0 0 8px; }
       label { display:block; margin: 8px 0 4px; }
@@ -13,7 +15,7 @@
       fieldset { border:1px solid #ddd; padding:10px; border-radius:8px; margin-top:12px; }
       legend { padding:0 6px; color:#444; }
       .hint { color:#666; font-size:11px; }
-      button { margin-top: 12px; padding: 8px; }
+      button { margin-top: 12px; padding: 8px; border-radius: 8px; }
     </style>
   </head>
   <body>
@@ -36,10 +38,12 @@
 
     <fieldset>
       <legend>Color mode</legend>
+
       <label>
         <input type="radio" name="colormode" value="random" checked>
         Random palette (default)
       </label>
+
       <label>
         <input type="radio" name="colormode" value="gradient">
         Sample from linear gradient style
@@ -75,6 +79,7 @@
           </div>
           <button id="createGradient">Create gradient style</button>
           <div class="hint">Creates a local linear gradient paint style you can reuse.</div>
+          <div class="hint">Note: Only <b>local</b> paint styles appear here. Duplicate library styles into this file if needed.</div>
         </fieldset>
       </div>
     </fieldset>
@@ -84,22 +89,31 @@
     <script>
       const $ = (id) => document.getElementById(id);
 
+      // === Utility to request current styles from main thread ===
+      function requestStyles() {
+        parent.postMessage({ pluginMessage: { type: 'request-styles' } }, '*');
+      }
+
+      // === Color mode helpers ===
       function getColorMode() {
         const el = document.querySelector('input[name="colormode"]:checked');
         return el ? el.value : 'random';
       }
 
-      // Toggle gradient controls
+      // Show/hide gradient controls and re-fetch styles
       document.querySelectorAll('input[name="colormode"]').forEach(r => {
         r.addEventListener('change', () => {
-          $('gradient-controls').style.display = getColorMode() === 'gradient' ? 'block' : 'none';
+          const isGradient = getColorMode() === 'gradient';
+          $('gradient-controls').style.display = isGradient ? 'block' : 'none';
+          if (isGradient) requestStyles();
         });
       });
 
-      // Receive styles list from plugin
+      // === Receive messages from code.js ===
       window.onmessage = (e) => {
         const msg = e.data.pluginMessage;
         if (!msg) return;
+
         if (msg.type === 'styles') {
           const sel = $('gradientStyle');
           sel.innerHTML = '';
@@ -117,8 +131,8 @@
             });
           }
         }
+
         if (msg.type === 'style-created') {
-          // add to dropdown and select it
           const sel = $('gradientStyle');
           const opt = document.createElement('option');
           opt.value = msg.style.id;
@@ -126,15 +140,20 @@
           sel.appendChild(opt);
           sel.value = msg.style.id;
         }
+
         if (msg.type === 'notify') {
-          // optional notifications from main
+          // Optional notifications
           // console.log(msg.message);
         }
       };
 
-      // Ask main thread for current styles list when UI loads
-      parent.postMessage({ pluginMessage: { type: 'request-styles' } }, '*');
+      // === Re-request styles when UI loads (and once more shortly after) ===
+      window.addEventListener('DOMContentLoaded', () => {
+        requestStyles();
+        setTimeout(requestStyles, 100); // timing safety for UI mount
+      });
 
+      // === Create new gradient style ===
       $('createGradient').onclick = () => {
         const payload = {
           type: 'create-gradient-style',
@@ -146,6 +165,7 @@
         parent.postMessage({ pluginMessage: payload }, '*');
       };
 
+      // === Run treemap ===
       $('run').onclick = () => {
         const count = parseInt($('count').value, 10);
         const padding = parseFloat($('padding').value);
@@ -154,7 +174,10 @@
         let weightsRaw = $('weights').value.trim();
         let weights = null;
         if (weightsRaw.length) {
-          weights = weightsRaw.split(/[\s,]+/).map(Number).filter(n => Number.isFinite(n) && n > 0);
+          weights = weightsRaw
+            .split(/[\s,]+/)
+            .map(Number)
+            .filter(n => Number.isFinite(n) && n > 0);
           if (!weights.length) weights = null;
         }
 
