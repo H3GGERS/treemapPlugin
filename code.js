@@ -1,24 +1,33 @@
 // === Utilities ===============================================================
 function hashSeed(s){let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
 function mulberry32(a){return function(){let t=(a+=0x6D2B79F5);t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}
-// Balanced random weights (Irwin–Hall, k controls variance)
+
+// Balanced random weights (Irwin–Hall; k controls variance)
 function randomWeights(n,rng){const k=3;const w=new Array(n);for(let i=0;i<n;i++){let s=0;for(let j=0;j<k;j++) s+=rng(); w[i]=Math.max(1e-6,s);}return w;}
+
 function clamp01(x){return Math.max(0,Math.min(1,x));}
 function lerp(a,b,t){return a+(b-a)*t;}
 function hexToRgb(hex){const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex.trim());if(!m)throw new Error('Bad color: '+hex);return{r:parseInt(m[1],16)/255,g:parseInt(m[2],16)/255,b:parseInt(m[3],16)/255};}
 function rgbToSolidPaint(rgb){return[{type:'SOLID',color:{r:rgb.r,g:rgb.g,b:rgb.b},opacity:1}];}
 
+function luminance(rgb){const f=(v)=>(v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4));return 0.2126*f(rgb.r)+0.7152*f(rgb.g)+0.0722*f(rgb.b);}
+function contrastTextPaintFor(rgb){return[{type:'SOLID',color:luminance(rgb)>0.5?{r:0,g:0,b:0}:{r:1,g:1,b:1},opacity:1}];}
+function normalize(values){const min=Math.min(...values),max=Math.max(...values);if(max-min<=1e-9)return values.map(()=>0.5);return values.map(v=>(v-min)/(max-min));}
+
+// Simple template renderer: replaces {{token}}
+function renderTemplate(tpl, vars){
+  return tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_,k)=> (k in vars ? String(vars[k]) : ''));
+}
+
 // === Squarified Treemap (mosaic + controlled randomness) ====================
 function squarifyTreemap(weights, W, H, basePadding, rng) {
-  // knobs (tune if you want different vibes)
-  const SORT_JITTER = 0.18; // 0..0.6: area order noise
-  const FLIP_PROB   = 0.55; // 0..1 : chance to flip orientation after each band
-  const BREAK_NOISE = 0.18; // 0..0.5: noise in 'worst' test -> band length variety
+  const SORT_JITTER = 0.18; // area order noise (0..0.6)
+  const FLIP_PROB   = 0.55; // chance to flip orientation after each band (0..1)
+  const BREAK_NOISE = 0.18; // noise in 'worst' break test (0..0.5)
 
   const total = weights.reduce((a,b)=>a+b,0); if (total <= 0) return [];
   const area  = W * H;
 
-  // jitter areas so similarly-sized items don't always cluster identically
   const items = weights.map((w,i)=>{
     const a = (w/total)*area;
     const jitter = 1 + SORT_JITTER * (rng() - 0.5) * 2;
@@ -38,13 +47,11 @@ function squarifyTreemap(weights, W, H, basePadding, rng) {
     return Math.max((s2*max)/(sum*sum), (sum*sum)/(s2*min));
   }
 
-  // start randomly (so some runs begin with columns)
-  let nextHorizontal = rng() < 0.5;
+  let nextHorizontal = rng() < 0.5; // start randomly
 
   function layoutRow(row){
     const rowSum = row.reduce((a,r)=>a+r.area, 0);
     const horizontal = nextHorizontal;
-    // thickness uses span along the orthogonal axis
     const thickness  = horizontal ? (rowSum / Math.max(EPS, w))
                                   : (rowSum / Math.max(EPS, h));
 
@@ -54,12 +61,7 @@ function squarifyTreemap(weights, W, H, basePadding, rng) {
         const rw = r.area / Math.max(EPS, thickness);
         const rh = thickness;
         const pad = Math.max(0, Math.min(basePadding, rw/2 - 0.5, rh/2 - 0.5));
-        rects.push({
-          x: _x + pad, y: y + pad,
-          w: Math.max(MIN_PX, rw - 2*pad),
-          h: Math.max(MIN_PX, rh - 2*pad),
-          index: r.index
-        });
+        rects.push({ x:_x+pad, y:y+pad, w:Math.max(MIN_PX,rw-2*pad), h:Math.max(MIN_PX,rh-2*pad), index:r.index });
         _x += rw;
       }
       y += thickness; h = Math.max(0, h - thickness);
@@ -69,29 +71,21 @@ function squarifyTreemap(weights, W, H, basePadding, rng) {
         const rh = r.area / Math.max(EPS, thickness);
         const rw = thickness;
         const pad = Math.max(0, Math.min(basePadding, rw/2 - 0.5, rh/2 - 0.5));
-        rects.push({
-          x: x + pad, y: _y + pad,
-          w: Math.max(MIN_PX, rw - 2*pad),
-          h: Math.max(MIN_PX, rh - 2*pad),
-          index: r.index
-        });
+        rects.push({ x:x+pad, y:_y+pad, w:Math.max(MIN_PX,rw-2*pad), h:Math.max(MIN_PX,rh-2*pad), index:r.index });
         _y += rh;
       }
       x += thickness; w = Math.max(0, w - thickness);
     }
 
-    // probabilistic flip -> mosaic feel
     if (rng() < FLIP_PROB) nextHorizontal = !nextHorizontal;
   }
 
   let row = [];
   while (items.length && w > EPS && h > EPS){
-    const side   = Math.max(EPS, Math.min(w, h)); // only for aspect test
+    const side   = Math.max(EPS, Math.min(w, h));
     const item   = items[0];
     const newRow = row.concat([item]);
-
-    // add noise to the decision to vary band size
-    const noise = 1 + BREAK_NOISE * (rng() - 0.5) * 2;
+    const noise  = 1 + BREAK_NOISE * (rng() - 0.5) * 2;
     const accept = (row.length === 0) ||
                    (worst(newRow.map(r=>r.area), side) <= worst(row.map(r=>r.area), side) * noise);
     if (accept) { row = newRow; items.shift(); }
@@ -176,7 +170,6 @@ function createLinearGradientStyle({name,start,end,angleDeg}){
   const style = figma.createPaintStyle(); style.name = name;
   const c0=hexToRgb(start), c1=hexToRgb(end);
   const theta=(angleDeg||0)*Math.PI/180, cos=Math.cos(theta), sin=Math.sin(theta);
-  // centered transform
   const G = [
     [ cos, sin,  0.5 - 0.5*cos - 0.5*sin],
     [-sin, cos,  0.5 + 0.5*sin - 0.5*cos],
@@ -193,6 +186,48 @@ function createLinearGradientStyle({name,start,end,angleDeg}){
   return { id: style.id, name: style.name };
 }
 
+// === Label rendering =========================================================
+async function addLabelIfFits({ rectNode, textPaint, labelText, minW=80, minH=48 }) {
+  if (rectNode.width < minW || rectNode.height < minH) return;
+
+  // load fonts (once per call; cached by Figma)
+  try {
+    await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+  } catch (_) {}
+
+  const text = figma.createText();
+  text.textAutoResize = "WIDTH_AND_HEIGHT";
+  text.characters = labelText;
+
+  // Base styles
+  text.fontName = { family: "Inter", style: "Regular" };
+  const baseSize = Math.max(10, Math.min(16, Math.floor(rectNode.height * 0.12)));
+  text.fontSize = baseSize;
+  text.lineHeight = { unit: "AUTO" };
+  text.textAlignHorizontal = "CENTER";
+  text.fills = textPaint;
+
+  // Bold the first line only
+  const firstLineEnd = labelText.indexOf('\n') === -1 ? labelText.length : labelText.indexOf('\n');
+  try {
+    text.setRangeFontName(0, firstLineEnd, { family: "Inter", style: "Bold" });
+    text.setRangeFontSize(0, firstLineEnd, Math.round(baseSize * 1.06));
+  } catch (_) {}
+
+  // Center inside the rect
+  rectNode.parent.appendChild(text);
+  text.x = rectNode.x + (rectNode.width  - text.width)  / 2;
+  text.y = rectNode.y + (rectNode.height - text.height) / 2;
+
+  // Final fit check (padding)
+  const PAD = 6;
+  const fits =
+    text.width  <= rectNode.width  - PAD*2 &&
+    text.height <= rectNode.height - PAD*2;
+  if (!fits) text.remove();
+}
+
 // === Plugin entry ============================================================
 figma.on('run', ({command})=>{
   if (command === 'create'){
@@ -205,7 +240,7 @@ figma.on('run', ({command})=>{
   }
 });
 
-figma.ui.onmessage = (msg)=>{
+figma.ui.onmessage = async (msg)=>{
   if (msg.type === 'request-styles'){
     figma.ui.postMessage({ type:'styles', styles: listLinearGradientStyles() });
     return;
@@ -232,29 +267,41 @@ figma.ui.onmessage = (msg)=>{
     const padding = Math.max(0, Number(msg.padding) || 0);
     const seed    = (msg.seed && String(msg.seed).length) ? String(msg.seed) : String(Math.floor(Math.random()*1e9));
     const rng     = mulberry32(hashSeed(seed));
+    const labelTemplate = (msg.labelTemplate && String(msg.labelTemplate).length)
+      ? String(msg.labelTemplate)
+      : "{{name}}\n{{percent}}%";
 
     const weights = (Array.isArray(msg.weights) && msg.weights.length)
       ? msg.weights.map(Number).filter(n=>Number.isFinite(n) && n>0)
       : randomWeights(count, rng);
 
-    // NOTE: pass rng to treemap for controlled randomness
     const rects = squarifyTreemap(weights, frame.width, frame.height, padding, rng);
     const container = createTreemapContainer(frame);
+
+    const totalsum = weights.reduce((a,b)=>a+b,0);
+    const normWeights = normalize(weights);
 
     const useGradient = (msg.colorMode === 'gradient') && msg.gradientStyleId;
     const gradPaint   = useGradient ? getGradientPaintFromStyleId(msg.gradientStyleId) : null;
 
-    for (const r of rects){
+    for (let i = 0; i < rects.length; i++){
+      const r = rects[i];
       const node = figma.createRectangle();
       node.x = r.x; node.y = r.y;
       node.resizeWithoutConstraints(Math.max(1,r.w), Math.max(1,r.h));
 
+      let usedRgb = null;
+
       if (gradPaint){
-        // sample a solid color from the gradient at random t
-        const t = rng(); const rgb = sampleFromGradientPaint(gradPaint, t);
+        // correlate color with weight
+        const t = normWeights[r.index];
+        const rgb = sampleFromGradientPaint(gradPaint, t);
         node.fills = rgbToSolidPaint(rgb);
+        usedRgb = rgb;
       } else {
-        node.fills = randomColorFor(r.index, rng);
+        const fill = randomColorFor(r.index, rng);
+        node.fills = fill;
+        const c = fill[0].color; usedRgb = { r:c.r, g:c.g, b:c.b };
       }
 
       node.strokes = [{ type:'SOLID', color:{ r:0,g:0,b:0 }, opacity:0.14 }];
@@ -262,6 +309,19 @@ figma.ui.onmessage = (msg)=>{
       node.name = `Cell ${r.index+1}`;
       container.appendChild(node);
       clampToContainer(node, container);
+
+      // Build label from template; fall back to default name
+      const name = `Cell ${r.index+1}`;
+      const percent = Math.round((weights[r.index] / totalsum) * 100);
+      const labelText = renderTemplate(labelTemplate, {
+        name, index: (r.index+1), percent
+      });
+
+      await addLabelIfFits({
+        rectNode: node,
+        textPaint: contrastTextPaintFor(usedRgb),
+        labelText
+      });
     }
 
     figma.notify(`Treemap created: ${rects.length} rectangles`);
