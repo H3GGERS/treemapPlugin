@@ -12,18 +12,44 @@ function rgbToSolidPaint(rgb){return[{type:'SOLID',color:{r:rgb.r,g:rgb.g,b:rgb.
 
 function luminance(rgb){const f=(v)=>(v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4));return 0.2126*f(rgb.r)+0.7152*f(rgb.g)+0.0722*f(rgb.b);}
 function contrastTextPaintFor(rgb){return[{type:'SOLID',color:luminance(rgb)>0.5?{r:0,g:0,b:0}:{r:1,g:1,b:1},opacity:1}];}
-function normalize(values){const min=Math.min(...values),max=Math.max(...values);if(max-min<=1e-9)return values.map(()=>0.5);return values.map(v=>(v-min)/(max-min));}
 
 // Simple template renderer: replaces {{token}}
 function renderTemplate(tpl, vars){
   return tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_,k)=> (k in vars ? String(vars[k]) : ''));
 }
 
+// === Signed mapping helpers (for bi-polar gradients) ========================
+function signedDeviations(values){
+  // Map values to s in [-1, +1] around the mean. s=0 at mean.
+  const n=values.length; if(n===0) return [];
+  const mean = values.reduce((a,b)=>a+b,0)/n;
+  let min = Infinity, max = -Infinity;
+  for (const v of values){ if(v<min) min=v; if(v>max) max=v; }
+  const denom = Math.max(mean-min, max-mean, 1e-9);
+  return values.map(v => Math.max(-1, Math.min(1, (v-mean)/denom )));
+}
+
+function middleStopPosition(gradPaint){
+  // Return the position of the middle stop (by position). If <3 stops, use 0.5.
+  const stops = gradPaint.gradientStops.slice().sort((a,b)=>a.position-b.position);
+  if (stops.length >= 3) {
+    const midIdx = Math.floor(stops.length/2);
+    return clamp01(stops[midIdx].position);
+  }
+  return 0.5;
+}
+
+function mapSignedToGradientT(s, midPos){
+  // s in [-1,1], midPos in [0,1] is the "zero" anchor.
+  if (s >= 0) return midPos + (1 - midPos) * s;
+  return midPos * (1 + s); // s is negative: at -1 => 0, at 0 => midPos
+}
+
 // === Squarified Treemap (mosaic + controlled randomness) ====================
 function squarifyTreemap(weights, W, H, basePadding, rng) {
   const SORT_JITTER = 0.18; // area order noise (0..0.6)
-  const FLIP_PROB   = 0.55; // chance to flip orientation after each band (0..1)
-  const BREAK_NOISE = 0.18; // noise in 'worst' break test (0..0.5)
+  const FLIP_PROB   = 0.55; // chance to flip orientation after each band
+  const BREAK_NOISE = 0.18; // noise in the 'worst' break test
 
   const total = weights.reduce((a,b)=>a+b,0); if (total <= 0) return [];
   const area  = W * H;
@@ -190,7 +216,6 @@ function createLinearGradientStyle({name,start,end,angleDeg}){
 async function addLabelIfFits({ rectNode, textPaint, labelText, minW=80, minH=48 }) {
   if (rectNode.width < minW || rectNode.height < minH) return;
 
-  // load fonts (once per call; cached by Figma)
   try {
     await figma.loadFontAsync({ family: "Inter", style: "Bold" });
     await figma.loadFontAsync({ family: "Inter", style: "Regular" });
@@ -200,7 +225,6 @@ async function addLabelIfFits({ rectNode, textPaint, labelText, minW=80, minH=48
   text.textAutoResize = "WIDTH_AND_HEIGHT";
   text.characters = labelText;
 
-  // Base styles
   text.fontName = { family: "Inter", style: "Regular" };
   const baseSize = Math.max(10, Math.min(16, Math.floor(rectNode.height * 0.12)));
   text.fontSize = baseSize;
@@ -208,19 +232,16 @@ async function addLabelIfFits({ rectNode, textPaint, labelText, minW=80, minH=48
   text.textAlignHorizontal = "CENTER";
   text.fills = textPaint;
 
-  // Bold the first line only
   const firstLineEnd = labelText.indexOf('\n') === -1 ? labelText.length : labelText.indexOf('\n');
   try {
     text.setRangeFontName(0, firstLineEnd, { family: "Inter", style: "Bold" });
     text.setRangeFontSize(0, firstLineEnd, Math.round(baseSize * 1.06));
   } catch (_) {}
 
-  // Center inside the rect
   rectNode.parent.appendChild(text);
   text.x = rectNode.x + (rectNode.width  - text.width)  / 2;
   text.y = rectNode.y + (rectNode.height - text.height) / 2;
 
-  // Final fit check (padding)
   const PAD = 6;
   const fits =
     text.width  <= rectNode.width  - PAD*2 &&
@@ -231,8 +252,7 @@ async function addLabelIfFits({ rectNode, textPaint, labelText, minW=80, minH=48
 // === Plugin entry ============================================================
 figma.on('run', ({command})=>{
   if (command === 'create'){
-    figma.showUI(__html__, { width: 380, height: 560 });
-    // send styles now and again shortly after (UI mount timing safety)
+    figma.showUI(__html__, { width: 380, height: 600 });
     figma.ui.postMessage({ type:'styles', styles: listLinearGradientStyles() });
     setTimeout(()=>figma.ui.postMessage({ type:'styles', styles: listLinearGradientStyles() }), 50);
   } else {
@@ -279,25 +299,29 @@ figma.ui.onmessage = async (msg)=>{
     const container = createTreemapContainer(frame);
 
     const totalsum = weights.reduce((a,b)=>a+b,0);
-    const normWeights = normalize(weights);
+    const areaPercents = weights.map(w => (w / totalsum)); // for non-gradient labels
+    const signed = signedDeviations(weights);               // for gradient mapping
 
     const useGradient = (msg.colorMode === 'gradient') && msg.gradientStyleId;
     const gradPaint   = useGradient ? getGradientPaintFromStyleId(msg.gradientStyleId) : null;
+    const midPos      = (useGradient && gradPaint) ? middleStopPosition(gradPaint) : 0.5;
 
-    for (let i = 0; i < rects.length; i++){
-      const r = rects[i];
+    for (const r of rects){
       const node = figma.createRectangle();
       node.x = r.x; node.y = r.y;
       node.resizeWithoutConstraints(Math.max(1,r.w), Math.max(1,r.h));
 
       let usedRgb = null;
+      let displayPercent = Math.round(areaPercents[r.index] * 100); // default (palette mode)
 
-      if (gradPaint){
-        // correlate color with weight
-        const t = normWeights[r.index];
+      if (useGradient && gradPaint){
+        // s in [-1,1], map to t with midPos as 0%
+        const s = signed[r.index];
+        const t = mapSignedToGradientT(s, midPos);
         const rgb = sampleFromGradientPaint(gradPaint, t);
         node.fills = rgbToSolidPaint(rgb);
         usedRgb = rgb;
+        displayPercent = Math.round(s * 100); // negative ↔ left, 0 ↔ middle, positive ↔ right
       } else {
         const fill = randomColorFor(r.index, rng);
         node.fills = fill;
@@ -310,11 +334,9 @@ figma.ui.onmessage = async (msg)=>{
       container.appendChild(node);
       clampToContainer(node, container);
 
-      // Build label from template; fall back to default name
       const name = `Cell ${r.index+1}`;
-      const percent = Math.round((weights[r.index] / totalsum) * 100);
       const labelText = renderTemplate(labelTemplate, {
-        name, index: (r.index+1), percent
+        name, index: (r.index+1), percent: displayPercent
       });
 
       await addLabelIfFits({
