@@ -4,20 +4,53 @@
     <meta charset="utf-8" />
     <title>TreeMapper</title>
     <style>
-      :root { color-scheme: light; }
+      :root { color-scheme: dark; }
       body {
         font: 12px/1.4 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
         margin: 12px;
-        color: #111;
+        background: #333333;
+        color: #e0e0e0;
       }
-      h3 { margin: 0 0 8px; font-size: 13px; }
-      label { display: block; margin: 6px 0 3px; }
-      input, select, textarea, button { width: 100%; box-sizing: border-box; font-size: 12px; }
+      h3 { margin: 0 0 8px; font-size: 13px; color: #ffffff; }
+      label { display: block; margin: 6px 0 3px; color: #e0e0e0; }
+      input, select, textarea, button { 
+        width: 100%; 
+        box-sizing: border-box; 
+        font-size: 12px;
+        background: #2a2a2a;
+        color: #e0e0e0;
+        border: 1px solid #555;
+        padding: 6px 8px;
+        border-radius: 4px;
+      }
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: #007AFF;
+        background: #2f2f2f;
+      }
+      input::placeholder, textarea::placeholder {
+        color: #999;
+      }
       textarea { resize: vertical; }
-      fieldset { border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-top: 12px; }
-      legend { padding: 0 6px; color: #444; font-weight: 500; }
-      .hint { color: #666; font-size: 11px; }
-      button { margin-top: 12px; padding: 8px; border-radius: 8px; }
+      fieldset { border: 1px solid #555; padding: 10px; border-radius: 8px; margin-top: 12px; background: #2a2a2a; }
+      legend { padding: 0 6px; color: #e0e0e0; font-weight: 500; }
+      .hint { color: #aaa; font-size: 11px; }
+      button { 
+        margin-top: 12px; 
+        padding: 8px; 
+        border-radius: 8px;
+        background: #007AFF;
+        color: #ffffff;
+        border: none;
+        cursor: pointer;
+        font-weight: 500;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:active {
+        background: #004494;
+      }
 
       .row { display: flex; gap: 8px; }
       .row > div { flex: 1; }
@@ -33,13 +66,10 @@
         user-select: none;
       }
       .inline-radio:hover {
-        background: rgba(0, 0, 0, 0.04);
-      }
-      @media (prefers-color-scheme: dark) {
-        .inline-radio:hover { background: rgba(255, 255, 255, 0.06); }
+        background: rgba(255, 255, 255, 0.08);
       }
       .inline-radio input[type="radio"] {
-        width: auto; /* don’t stretch */
+        width: auto; /* don't stretch */
         accent-color: #007AFF; /* optional Figma blue */
         margin: 0;
         transform: scale(1.05);
@@ -48,6 +78,152 @@
         margin: 0; /* keep single-line, tight */
         width: auto;
         flex: 1 1 auto;
+        color: #e0e0e0;
+      }
+
+      /* Figma-style gradient picker */
+      .gradient-picker {
+        margin-top: 12px;
+        padding: 12px;
+        background: #2a2a2a;
+        border-radius: 8px;
+        border: 1px solid #555;
+      }
+      .gradient-type-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .gradient-type-row select {
+        flex: 1;
+        width: auto;
+      }
+      .gradient-type-row .gradient-reverse {
+        width: auto;
+        padding: 4px 8px;
+        background: transparent;
+        border: 1px solid #555;
+        cursor: pointer;
+        color: #e0e0e0;
+        font-size: 14px;
+      }
+      .gradient-type-row .gradient-reverse:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .gradient-bar-container {
+        position: relative;
+        margin: 12px 0;
+        height: 40px;
+        border-radius: 4px;
+        overflow: hidden;
+        border: 1px solid #555;
+        cursor: crosshair;
+      }
+      .gradient-bar {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+      .gradient-stop {
+        position: absolute;
+        top: -4px;
+        width: 12px;
+        height: 12px;
+        margin-left: -6px;
+        border: 2px solid #fff;
+        border-radius: 2px;
+        background: #fff;
+        cursor: pointer;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        z-index: 2;
+      }
+      .gradient-stop:hover {
+        transform: scale(1.2);
+      }
+      .gradient-stop.active {
+        border-color: #007AFF;
+        box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3);
+      }
+      .stops-section {
+        margin-top: 16px;
+      }
+      .stops-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .stops-header label {
+        margin: 0;
+        font-size: 11px;
+        font-weight: 500;
+        color: #aaa;
+        text-transform: uppercase;
+      }
+      .add-stop-btn {
+        width: auto;
+        padding: 4px 8px;
+        background: transparent;
+        border: 1px solid #555;
+        color: #e0e0e0;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        margin: 0;
+      }
+      .add-stop-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .stop-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+        padding: 6px;
+        border-radius: 4px;
+        background: #1f1f1f;
+      }
+      .stop-item.active {
+        background: rgba(0, 122, 255, 0.15);
+        border: 1px solid rgba(0, 122, 255, 0.3);
+      }
+      .stop-percentage {
+        width: 50px;
+        font-size: 11px;
+        padding: 4px;
+        text-align: center;
+      }
+      .stop-color-input {
+        flex: 1;
+        font-size: 11px;
+        padding: 4px;
+        font-family: monospace;
+      }
+      .stop-opacity {
+        width: 60px;
+        font-size: 11px;
+        padding: 4px;
+        text-align: center;
+      }
+      .stop-remove {
+        width: auto;
+        padding: 4px 8px;
+        background: transparent;
+        border: 1px solid #555;
+        color: #e0e0e0;
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+        margin: 0;
+      }
+      .stop-remove:hover {
+        background: rgba(255, 0, 0, 0.2);
+        border-color: #ff4444;
+      }
+      .stop-remove:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
       }
     </style>
   </head>
@@ -91,32 +267,42 @@
           <option value="">(loading…)</option>
         </select>
 
-        <fieldset style="margin-top:10px;">
-          <legend>Create new gradient style</legend>
-          <div class="row">
-            <div>
-              <label>Start color</label>
-              <input id="gStart" type="text" value="#5F88FF" />
-            </div>
-            <div>
-              <label>End color</label>
-              <input id="gEnd" type="text" value="#00D0A0" />
-            </div>
+        <div class="gradient-picker">
+          <div class="gradient-type-row">
+            <select id="gType">
+              <option value="linear">Linear</option>
+            </select>
+            <button type="button" class="gradient-reverse" id="gReverse" title="Reverse gradient">↔</button>
           </div>
-          <div class="row">
-            <div>
-              <label>Angle (deg)</label>
-              <input id="gAngle" type="number" value="0" />
-            </div>
-            <div>
-              <label>Name</label>
-              <input id="gName" type="text" value="Treemap Gradient" />
-            </div>
+
+          <div class="gradient-bar-container" id="gradientBarContainer">
+            <div class="gradient-bar" id="gradientBar"></div>
           </div>
-          <button id="createGradient">Create gradient style</button>
-          <div class="hint">Creates a local linear gradient paint style you can reuse.</div>
-          <div class="hint">Note: Only <b>local</b> paint styles appear here. Duplicate library styles into this file if needed.</div>
-        </fieldset>
+
+          <div class="stops-section">
+            <div class="stops-header">
+              <label>Stops</label>
+              <button type="button" class="add-stop-btn" id="addStop">+</button>
+            </div>
+            <div id="stopsList"></div>
+          </div>
+
+          <div style="margin-top: 12px;">
+            <div class="row">
+              <div>
+                <label>Angle (deg)</label>
+                <input id="gAngle" type="number" value="0" />
+              </div>
+              <div>
+                <label>Name</label>
+                <input id="gName" type="text" value="Treemap Gradient" />
+              </div>
+            </div>
+            <button id="createGradient">Create gradient style</button>
+            <div class="hint">Creates a local linear gradient paint style you can reuse.</div>
+            <div class="hint">Note: Only <b>local</b> paint styles appear here. Duplicate library styles into this file if needed.</div>
+          </div>
+        </div>
       </div>
     </fieldset>
 
@@ -139,11 +325,274 @@
       function updateColorModeUI() {
         const isGradient = getColorMode() === 'gradient';
         $('gradient-controls').style.display = isGradient ? 'block' : 'none';
-        if (isGradient) requestStyles();
+        if (isGradient) {
+          requestStyles();
+          initGradientPicker();
+        }
       }
       document.querySelectorAll('input[name="colormode"]').forEach(r => {
         r.addEventListener('change', updateColorModeUI);
       });
+
+      // Gradient picker state
+      let gradientStops = [
+        { position: 0, color: '#5F88FF', opacity: 100 },
+        { position: 100, color: '#00D0A0', opacity: 100 }
+      ];
+      let activeStopIndex = 0;
+      let isDragging = false;
+
+      // Initialize gradient picker
+      function initGradientPicker() {
+        renderGradientBar();
+        renderStopsList();
+        setupGradientBarInteractions();
+        setupReverseButton();
+        setupAddStopButton();
+      }
+
+      // Render gradient bar with stops
+      function renderGradientBar() {
+        const bar = $('gradientBar');
+        const stops = gradientStops.sort((a, b) => a.position - b.position);
+        
+        // Create gradient string
+        const gradientStopsStr = stops.map(s => {
+          const rgb = hexToRgb(s.color);
+          const alpha = s.opacity / 100;
+          return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha}) ${s.position}%`;
+        }).join(', ');
+        
+        bar.style.background = `linear-gradient(to right, ${gradientStopsStr})`;
+        
+        // Render stop markers
+        bar.innerHTML = '';
+        stops.forEach((stop, idx) => {
+          const marker = document.createElement('div');
+          marker.className = `gradient-stop ${idx === activeStopIndex ? 'active' : ''}`;
+          marker.style.left = `${stop.position}%`;
+          marker.style.backgroundColor = stop.color;
+          marker.dataset.index = idx;
+          bar.appendChild(marker);
+        });
+      }
+
+      // Render stops list
+      function renderStopsList() {
+        const list = $('stopsList');
+        list.innerHTML = '';
+        const sortedStops = [...gradientStops].sort((a, b) => a.position - b.position);
+        
+        sortedStops.forEach((stop, displayIdx) => {
+          const actualIdx = gradientStops.indexOf(stop);
+          const item = document.createElement('div');
+          item.className = `stop-item ${actualIdx === activeStopIndex ? 'active' : ''}`;
+          
+          item.innerHTML = `
+            <input type="text" class="stop-percentage" value="${Math.round(stop.position)}%" 
+                   data-index="${actualIdx}" />
+            <input type="text" class="stop-color-input" value="${stop.color.toUpperCase()}" 
+                   data-index="${actualIdx}" />
+            <input type="text" class="stop-opacity" value="${stop.opacity}%" 
+                   data-index="${actualIdx}" />
+            <button type="button" class="stop-remove" data-index="${actualIdx}"
+                    ${gradientStops.length <= 2 ? 'disabled' : ''}>−</button>
+          `;
+          
+          list.appendChild(item);
+        });
+
+        // Attach event listeners
+        list.querySelectorAll('.stop-percentage').forEach(input => {
+          input.addEventListener('change', (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val >= 0 && val <= 100) {
+              gradientStops[idx].position = val;
+              renderGradientBar();
+              renderStopsList();
+            }
+          });
+        });
+
+        list.querySelectorAll('.stop-color-input').forEach(input => {
+          input.addEventListener('change', (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            const color = e.target.value.trim();
+            if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+              gradientStops[idx].color = color;
+              renderGradientBar();
+              renderStopsList();
+            }
+          });
+        });
+
+        list.querySelectorAll('.stop-opacity').forEach(input => {
+          input.addEventListener('change', (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val >= 0 && val <= 100) {
+              gradientStops[idx].opacity = val;
+              renderGradientBar();
+            }
+          });
+        });
+
+        list.querySelectorAll('.stop-remove').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            if (gradientStops.length > 2) {
+              gradientStops.splice(idx, 1);
+              if (activeStopIndex >= gradientStops.length) {
+                activeStopIndex = gradientStops.length - 1;
+              }
+              renderGradientBar();
+              renderStopsList();
+            }
+          });
+        });
+
+        // Click to activate stop
+        list.querySelectorAll('.stop-item').forEach(item => {
+          item.addEventListener('click', (e) => {
+            if (e.target.classList.contains('stop-remove')) return;
+            const idx = parseInt(item.querySelector('.stop-percentage').dataset.index);
+            activeStopIndex = idx;
+            renderGradientBar();
+            renderStopsList();
+          });
+        });
+      }
+
+      // Setup gradient bar interactions
+      function setupGradientBarInteractions() {
+        const container = $('gradientBarContainer');
+        const bar = $('gradientBar');
+
+        // Click to add stop
+        container.addEventListener('click', (e) => {
+          if (e.target.classList.contains('gradient-stop')) return;
+          const rect = container.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+          
+          // Find color at this position
+          const sortedStops = [...gradientStops].sort((a, b) => a.position - b.position);
+          let color = '#FFFFFF';
+          if (percent <= sortedStops[0].position) {
+            color = sortedStops[0].color;
+          } else if (percent >= sortedStops[sortedStops.length - 1].position) {
+            color = sortedStops[sortedStops.length - 1].color;
+          } else {
+            for (let i = 0; i < sortedStops.length - 1; i++) {
+              if (percent >= sortedStops[i].position && percent <= sortedStops[i + 1].position) {
+                const ratio = (percent - sortedStops[i].position) / 
+                             (sortedStops[i + 1].position - sortedStops[i].position);
+                color = interpolateColor(sortedStops[i].color, sortedStops[i + 1].color, ratio);
+                break;
+              }
+            }
+          }
+
+          gradientStops.push({ position: percent, color, opacity: 100 });
+          activeStopIndex = gradientStops.length - 1;
+          renderGradientBar();
+          renderStopsList();
+        });
+
+        // Drag stops
+        bar.addEventListener('mousedown', (e) => {
+          if (e.target.classList.contains('gradient-stop')) {
+            isDragging = true;
+            activeStopIndex = parseInt(e.target.dataset.index);
+            renderGradientBar();
+            renderStopsList();
+          }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+          if (isDragging) {
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+            gradientStops[activeStopIndex].position = percent;
+            renderGradientBar();
+            renderStopsList();
+          }
+        });
+
+        document.addEventListener('mouseup', () => {
+          isDragging = false;
+        });
+      }
+
+      // Setup reverse button
+      function setupReverseButton() {
+        const reverseBtn = $('gReverse');
+        if (reverseBtn) {
+          reverseBtn.onclick = () => {
+            gradientStops = gradientStops.map(s => ({
+              ...s,
+              position: 100 - s.position
+            }));
+            renderGradientBar();
+            renderStopsList();
+          };
+        }
+      }
+
+      // Add stop button
+      function setupAddStopButton() {
+        const addBtn = $('addStop');
+        if (addBtn) {
+          addBtn.onclick = () => {
+            const newPos = gradientStops.length > 0 
+              ? gradientStops.reduce((sum, s) => sum + s.position, 0) / gradientStops.length
+              : 50;
+            const sortedStops = [...gradientStops].sort((a, b) => a.position - b.position);
+            let color = '#FFFFFF';
+            if (sortedStops.length >= 2) {
+              const idx = Math.floor((newPos / 100) * (sortedStops.length - 1));
+              const ratio = (newPos - sortedStops[idx].position) / 
+                           (sortedStops[idx + 1].position - sortedStops[idx].position);
+              color = interpolateColor(sortedStops[idx].color, sortedStops[idx + 1].color, ratio);
+            } else if (sortedStops.length === 1) {
+              color = sortedStops[0].color;
+            }
+            gradientStops.push({ position: newPos, color, opacity: 100 });
+            activeStopIndex = gradientStops.length - 1;
+            renderGradientBar();
+            renderStopsList();
+          };
+        }
+      }
+
+      // Helper functions
+      function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16)
+        } : { r: 255, g: 255, b: 255 };
+      }
+
+      function rgbToHex(r, g, b) {
+        return '#' + [r, g, b].map(x => {
+          const hex = Math.round(x).toString(16);
+          return hex.length === 1 ? '0' + hex : hex;
+        }).join('');
+      }
+
+      function interpolateColor(color1, color2, ratio) {
+        const c1 = hexToRgb(color1);
+        const c2 = hexToRgb(color2);
+        return rgbToHex(
+          c1.r + (c2.r - c1.r) * ratio,
+          c1.g + (c2.g - c1.g) * ratio,
+          c1.b + (c2.b - c1.b) * ratio
+        );
+      }
 
       // Receive messages from code.js
       window.onmessage = (e) => {
@@ -183,16 +632,22 @@
         requestStyles();
         setTimeout(requestStyles, 100); // timing safety
         updateColorModeUI();
+        // Initialize gradient picker if gradient mode is selected
+        if (getColorMode() === 'gradient') {
+          initGradientPicker();
+        }
       });
 
       // Create gradient style
       $('createGradient').onclick = () => {
+        const sortedStops = [...gradientStops].sort((a, b) => a.position - b.position);
         const payload = {
           type: 'create-gradient-style',
           name: $('gName').value.trim() || 'Treemap Gradient',
-          start: $('gStart').value.trim(),
-          end: $('gEnd').value.trim(),
-          angle: parseFloat($('gAngle').value) || 0
+          start: sortedStops[0].color,
+          end: sortedStops[sortedStops.length - 1].color,
+          angle: parseFloat($('gAngle').value) || 0,
+          stops: sortedStops
         };
         parent.postMessage({ pluginMessage: payload }, '*');
       };
